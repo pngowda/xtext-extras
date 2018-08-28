@@ -1,7 +1,8 @@
 package org.eclipse.xtext.java.resource
 
-import java.util.ArrayList
-import java.util.Map
+import com.google.common.collect.Lists
+import org.eclipse.emf.ecore.resource.Resource
+import org.eclipse.jdt.core.compiler.CharOperation
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader
 import org.eclipse.jdt.internal.compiler.env.INameEnvironment
@@ -11,9 +12,6 @@ import org.eclipse.xtext.common.types.TypesPackage
 import org.eclipse.xtext.common.types.descriptions.EObjectDescriptionBasedStubGenerator
 import org.eclipse.xtext.naming.QualifiedName
 import org.eclipse.xtext.resource.IResourceDescriptions
-import org.eclipse.emf.ecore.resource.Resource
-import java.io.InputStream
-import org.eclipse.jdt.internal.compiler.env.IBinaryType
 
 @FinalFieldsConstructor class IndexAwareNameEnvironment implements INameEnvironment {
 
@@ -23,11 +21,7 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryType
 	val EObjectDescriptionBasedStubGenerator stubGenerator
 	val ClassFileCache classFileCache
 	
-	Map<QualifiedName, NameEnvironmentAnswer> nameToAnswerCache = newHashMap()
-
 	override cleanup() {
-		nameToAnswerCache.clear
-		classFileCache.clear
 	}
 
 	override findType(char[][] compoundTypeName) {
@@ -36,64 +30,34 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryType
 	}
 	
 	def NameEnvironmentAnswer findType(QualifiedName className) {
-		if (classFileCache.containsKey(className)) {
-			val t = classFileCache.get(className)
-			// TODO is this ok?
-			if (t===null) {
-				return null
-			}
-			return new NameEnvironmentAnswer(t, null)
-		}
-		if (nameToAnswerCache.containsKey(className)) {
-			return nameToAnswerCache.get(className)
-		}
-		val candidate = resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false).head
-		var NameEnvironmentAnswer result = null 
-		if (candidate !== null) {
-			val resourceDescription = resourceDescriptions.getResourceDescription(candidate.EObjectURI.trimFragment)
-			val res = resource.resourceSet.getResource(resourceDescription.URI, false)
-			val source = if (res instanceof JavaResource) {
-			    (res as JavaResource).originalSource
+		return classFileCache.computeIfAbsent(className) [
+			val candidate = resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false).head
+			if (candidate !== null) {
+				val resourceDescription = resourceDescriptions.getResourceDescription(candidate.EObjectURI.trimFragment)
+				val res = resource.resourceSet.getResource(resourceDescription.URI, false)
+				val source = if (res instanceof JavaResource) {
+				    (res as JavaResource).originalSource
+				} else {
+				    stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray
+				}
+				return new CompilationUnit(source, className.toString('/')+'.java', null)
 			} else {
-			    stubGenerator.getJavaStubSource(candidate, resourceDescription)
-			}
-			result = new NameEnvironmentAnswer(new CompilationUnit(source.toCharArray, className.toString('/')+'.java', null), null)
-		} else {
-			val fileName = className.toString('/') + ".class"
-			val url = classLoader.getResource(fileName)
-			if (url === null) {
-				nameToAnswerCache.put(className, null)
-				//TODO is that ok
-				classFileCache.put(className, null)
-				return null;
-			}
-			// todo: try with resources/ close Stream
-			var InputStream stream = null
-			val IBinaryType reader = try {
-				stream = url.openStream
-				ClassFileReader.read(url.openStream, fileName)
-				//TODO what if read fails
-			} finally {
-				if (stream !== null) {
+				val fileName = className.toString('/') + ".class"
+				val stream = classLoader.getResourceAsStream(fileName)
+				if (stream === null) {
+					return null;
+				}
+				try {
+					return ClassFileReader.read(stream, fileName)
+				} finally {
 					stream.close
 				}
 			}
-			// TODO is this ok?
-			// TODO what if reader is null
-			if (reader === null) {
-				return null;
-			}
-			classFileCache.put(className, reader)
-			result = new NameEnvironmentAnswer(reader, null)
-		}
-		nameToAnswerCache.put(className, result)
-		return result
+		]
 	}
 
 	override findType(char[] typeName, char[][] packageName) {
-		val list = new ArrayList(packageName.map[String.valueOf(it)])
-		list += String.valueOf(typeName)
-		val className = QualifiedName.create(list)
+		val className = QualifiedName.create(Lists.asList(String.valueOf(typeName), CharOperation.toStrings(packageName)).reverseView)
 		return findType(className)
 	}
 

@@ -13,6 +13,8 @@ import java.util.function.Function
 import org.eclipse.jdt.internal.compiler.env.IBinaryType
 import org.eclipse.xtext.naming.QualifiedName
 import org.eclipse.xtext.util.internal.EmfAdaptable
+import org.eclipse.jdt.internal.compiler.env.NameEnvironmentAnswer
+import org.eclipse.jdt.internal.compiler.env.ICompilationUnit
 
 /**
  * @author Christian Dietrich - Initial contribution and API
@@ -28,7 +30,8 @@ class ClassFileCache {
 	//TODO: weak?
 	// type if Object by intention, but we store IBinaryTypes only
 	val Map<QualifiedName, Object> cache = new ConcurrentHashMap()
-	
+
+	/*	
 	def boolean containsKey(QualifiedName qualifiedName) {
 		return cache.containsKey(qualifiedName)
 	}
@@ -48,19 +51,23 @@ class ClassFileCache {
 			cache.put(qualifiedName, answer)
 		}
 	}
-	
-	def IBinaryType computeIfAbsent(QualifiedName qualifiedName, Function<? super QualifiedName, ? extends IBinaryType> fun) {
-		val result = cache.computeIfAbsent(qualifiedName) [
-			fun.apply(it) ?: NULL
+	*/
+	 
+	def NameEnvironmentAnswer computeIfAbsent(QualifiedName qualifiedName, Function<? super QualifiedName, ? extends Object> fun) {
+		val binaryTypeOrCompilationUnit = cache.computeIfAbsent(qualifiedName) [
+			return fun.apply(it) ?: NULL
 		]
-		if (result !== NULL) { // TODO should this ever happen
-			return result as IBinaryType;
+		if (binaryTypeOrCompilationUnit instanceof IBinaryType) {
+			return new NameEnvironmentAnswer(binaryTypeOrCompilationUnit, null)	
+		}
+		if (binaryTypeOrCompilationUnit instanceof ICompilationUnit) {
+			return new NameEnvironmentAnswer(binaryTypeOrCompilationUnit, null)
 		}
 		return null
 	}
 	
-	def void clear() {
-		cache.clear()
-	}
+//	def void clear() {
+//		cache.clear()
+//	}
 	
 }

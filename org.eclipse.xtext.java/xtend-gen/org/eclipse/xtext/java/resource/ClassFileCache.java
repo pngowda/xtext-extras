@@ -15,6 +15,8 @@ import org.eclipse.emf.common.notify.Adapter;
 import org.eclipse.emf.common.notify.Notifier;
 import org.eclipse.emf.common.notify.impl.AdapterImpl;
 import org.eclipse.jdt.internal.compiler.env.IBinaryType;
+import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
+import org.eclipse.jdt.internal.compiler.env.NameEnvironmentAnswer;
 import org.eclipse.xtext.naming.QualifiedName;
 import org.eclipse.xtext.util.internal.EmfAdaptable;
 
@@ -46,30 +48,31 @@ public class ClassFileCache {
   
   private final Map<QualifiedName, Object> cache = new ConcurrentHashMap<QualifiedName, Object>();
   
-  public boolean containsKey(final QualifiedName qualifiedName) {
-    return this.cache.containsKey(qualifiedName);
-  }
-  
-  public IBinaryType get(final QualifiedName qualifiedName) {
-    final Object result = this.cache.get(qualifiedName);
-    if ((result == ClassFileCache.NULL)) {
-      return null;
-    }
-    return ((IBinaryType) result);
-  }
-  
-  public void put(final QualifiedName qualifiedName, final IBinaryType answer) {
-    if ((answer == null)) {
-      this.cache.put(qualifiedName, ClassFileCache.NULL);
-    } else {
-      this.cache.put(qualifiedName, answer);
-    }
-  }
-  
-  public IBinaryType computeIfAbsent(final QualifiedName qualifiedName, final Function<? super QualifiedName, ? extends IBinaryType> fun) {
+  /**
+   * def boolean containsKey(QualifiedName qualifiedName) {
+   * return cache.containsKey(qualifiedName)
+   * }
+   * 
+   * def IBinaryType get(QualifiedName qualifiedName) {
+   * val result = cache.get(qualifiedName)
+   * if (result === NULL) {
+   * return null
+   * }
+   * return result as IBinaryType
+   * }
+   * 
+   * def void put(QualifiedName qualifiedName, IBinaryType answer) {
+   * if (answer === null) {
+   * cache.put(qualifiedName, NULL)
+   * } else {
+   * cache.put(qualifiedName, answer)
+   * }
+   * }
+   */
+  public NameEnvironmentAnswer computeIfAbsent(final QualifiedName qualifiedName, final Function<? super QualifiedName, ?> fun) {
     final Function<QualifiedName, Object> _function = (QualifiedName it) -> {
       Object _elvis = null;
-      IBinaryType _apply = fun.apply(it);
+      Object _apply = fun.apply(it);
       if (_apply != null) {
         _elvis = _apply;
       } else {
@@ -77,15 +80,14 @@ public class ClassFileCache {
       }
       return _elvis;
     };
-    final Object result = this.cache.computeIfAbsent(qualifiedName, _function);
-    if ((result != ClassFileCache.NULL)) {
-      return ((IBinaryType) result);
+    final Object binaryTypeOrCompilationUnit = this.cache.computeIfAbsent(qualifiedName, _function);
+    if ((binaryTypeOrCompilationUnit instanceof IBinaryType)) {
+      return new NameEnvironmentAnswer(((IBinaryType)binaryTypeOrCompilationUnit), null);
+    }
+    if ((binaryTypeOrCompilationUnit instanceof ICompilationUnit)) {
+      return new NameEnvironmentAnswer(((ICompilationUnit)binaryTypeOrCompilationUnit), null);
     }
     return null;
-  }
-  
-  public void clear() {
-    this.cache.clear();
   }
   
   public static ClassFileCache findInEmfObject(final Notifier emfObject) {

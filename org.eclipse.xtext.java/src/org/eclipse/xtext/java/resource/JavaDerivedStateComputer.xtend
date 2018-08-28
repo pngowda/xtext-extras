@@ -131,7 +131,7 @@ class JavaDerivedStateComputer {
 				// TODO What is with inner classes (they contain $)
 				// TODO is there a better way to obtain the class name
 				val key = QualifiedName.create(CharOperation.toStrings(cls.compoundName))
-				classFileCache.computeIfAbsent(key, [name|new ClassFileReader(cls.bytes, cls.fileName)])
+				classFileCache.computeIfAbsent(key) [name|new ClassFileReader(cls.bytes, cls.fileName)]
 			}
 			if (Arrays.equals(it.fileName, compilationUnit.fileName)) {
 				val map = newHashMap
