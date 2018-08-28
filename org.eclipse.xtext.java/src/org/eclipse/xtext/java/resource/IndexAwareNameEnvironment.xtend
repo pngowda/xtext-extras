@@ -1,8 +1,7 @@
 package org.eclipse.xtext.java.resource
 
-import com.google.common.collect.Lists
+import java.util.List
 import org.eclipse.emf.ecore.resource.Resource
-import org.eclipse.jdt.core.compiler.CharOperation
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader
 import org.eclipse.jdt.internal.compiler.env.INameEnvironment
@@ -33,11 +32,12 @@ import org.eclipse.xtext.resource.IResourceDescriptions
 		return classFileCache.computeIfAbsent(className) [
 			val candidate = resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false).head
 			if (candidate !== null) {
-				val resourceDescription = resourceDescriptions.getResourceDescription(candidate.EObjectURI.trimFragment)
-				val res = resource.resourceSet.getResource(resourceDescription.URI, false)
+				val resourceURI = candidate.EObjectURI.trimFragment
+				val res = resource.resourceSet.getResource(resourceURI, false)
 				val source = if (res instanceof JavaResource) {
 				    (res as JavaResource).originalSource
 				} else {
+					val resourceDescription = resourceDescriptions.getResourceDescription(resourceURI)
 				    stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray
 				}
 				return new CompilationUnit(source, className.toString('/')+'.java', null)
@@ -57,7 +57,12 @@ import org.eclipse.xtext.resource.IResourceDescriptions
 	}
 
 	override findType(char[] typeName, char[][] packageName) {
-		val className = QualifiedName.create(Lists.asList(String.valueOf(typeName), CharOperation.toStrings(packageName)).reverseView)
+		val List<String> segments = newArrayList
+		for(char[] packageSegment: packageName) {
+			segments.add(String.valueOf(packageSegment))
+		}
+		segments.add(String.valueOf(typeName))
+		val className = QualifiedName.create(segments)
 		return findType(className)
 	}
 

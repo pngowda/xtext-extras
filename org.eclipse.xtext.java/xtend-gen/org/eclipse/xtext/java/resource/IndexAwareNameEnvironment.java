@@ -1,11 +1,10 @@
 package org.eclipse.xtext.java.resource;
 
-import com.google.common.collect.Lists;
 import java.io.InputStream;
 import java.util.List;
 import java.util.function.Function;
+import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
-import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader;
 import org.eclipse.jdt.internal.compiler.env.INameEnvironment;
@@ -19,6 +18,7 @@ import org.eclipse.xtext.naming.QualifiedName;
 import org.eclipse.xtext.resource.IEObjectDescription;
 import org.eclipse.xtext.resource.IResourceDescription;
 import org.eclipse.xtext.resource.IResourceDescriptions;
+import org.eclipse.xtext.xbase.lib.CollectionLiterals;
 import org.eclipse.xtext.xbase.lib.Conversions;
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.eclipse.xtext.xbase.lib.Functions.Function1;
@@ -56,13 +56,18 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
       try {
         final IEObjectDescription candidate = IterableExtensions.<IEObjectDescription>head(this.resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false));
         if ((candidate != null)) {
-          final IResourceDescription resourceDescription = this.resourceDescriptions.getResourceDescription(candidate.getEObjectURI().trimFragment());
-          final Resource res = this.resource.getResourceSet().getResource(resourceDescription.getURI(), false);
+          final URI resourceURI = candidate.getEObjectURI().trimFragment();
+          final Resource res = this.resource.getResourceSet().getResource(resourceURI, false);
           char[] _xifexpression = null;
           if ((res instanceof JavaResource)) {
             _xifexpression = ((JavaResource) res).getOriginalSource();
           } else {
-            _xifexpression = this.stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray();
+            char[] _xblockexpression = null;
+            {
+              final IResourceDescription resourceDescription = this.resourceDescriptions.getResourceDescription(resourceURI);
+              _xblockexpression = this.stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray();
+            }
+            _xifexpression = _xblockexpression;
           }
           final char[] source = _xifexpression;
           String _string = className.toString("/");
@@ -90,7 +95,12 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
   
   @Override
   public NameEnvironmentAnswer findType(final char[] typeName, final char[][] packageName) {
-    final QualifiedName className = QualifiedName.create(ListExtensions.<String>reverseView(Lists.<String>asList(String.valueOf(typeName), CharOperation.toStrings(packageName))));
+    final List<String> segments = CollectionLiterals.<String>newArrayList();
+    for (final char[] packageSegment : packageName) {
+      segments.add(String.valueOf(packageSegment));
+    }
+    segments.add(String.valueOf(typeName));
+    final QualifiedName className = QualifiedName.create(segments);
     return this.findType(className);
   }
   
