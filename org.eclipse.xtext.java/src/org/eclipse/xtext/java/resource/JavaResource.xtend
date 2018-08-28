@@ -30,7 +30,6 @@ import org.eclipse.xtext.resource.IFragmentProvider
 import org.eclipse.xtext.resource.IFragmentProvider.Fallback
 import org.eclipse.xtext.resource.ISynchronizable
 import org.eclipse.xtext.util.concurrent.IUnitOfWork
-import org.eclipse.jdt.internal.compiler.util.Util
 
 class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISynchronizable<JavaResource> {
 	
@@ -51,12 +50,13 @@ class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISync
 	@Inject JavaDerivedStateComputer derivedStateComputer
 	
 	CompilationUnit compilationUnit
-	char[] contentsAsArray 
+	String contentsAsString 
 	
 	override protected doLoad(InputStream inputStream, Map<?, ?> options) throws IOException {
 		val encoding = getEncoding(getURI, options)
-		this.contentsAsArray = Util.getInputStreamAsCharArray(inputStream, -1, encoding)
-		this.compilationUnit = new CompilationUnit(contentsAsArray, URI.lastSegment, encoding, null, true, null)
+		val contentsAsString = CharStreams.toString(new InputStreamReader(inputStream, encoding))
+		this.contentsAsString = contentsAsString
+		compilationUnit = new CompilationUnit(contentsAsString.toCharArray, URI.lastSegment, encoding, null)
 	}
 	
 	protected def getEncoding(URI uri, Map<?, ?> options) {
@@ -108,7 +108,6 @@ class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISync
 		initializing[
 			derivedStateComputer.installFull(this)
 			this.compilationUnit = null
-			this.contentsAsArray = null
 			initialized = true
 		]
 	}
@@ -284,8 +283,8 @@ class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISync
 		m.getFragment(eObject, fallback)
 	}
     
-    def char[] getOriginalSource() {
-        return contentsAsArray;
+    def getOriginalSource() {
+        return contentsAsString;
     }
 	
 }

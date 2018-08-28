@@ -1,11 +1,14 @@
 package org.eclipse.xtext.java.resource;
 
 import java.io.InputStream;
-import java.util.function.Function;
-import org.eclipse.emf.common.util.URI;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader;
+import org.eclipse.jdt.internal.compiler.env.IBinaryType;
 import org.eclipse.jdt.internal.compiler.env.INameEnvironment;
 import org.eclipse.jdt.internal.compiler.env.NameEnvironmentAnswer;
 import org.eclipse.xtend.lib.annotations.FinalFieldsConstructor;
@@ -17,9 +20,12 @@ import org.eclipse.xtext.naming.QualifiedName;
 import org.eclipse.xtext.resource.IEObjectDescription;
 import org.eclipse.xtext.resource.IResourceDescription;
 import org.eclipse.xtext.resource.IResourceDescriptions;
+import org.eclipse.xtext.xbase.lib.CollectionLiterals;
 import org.eclipse.xtext.xbase.lib.Conversions;
 import org.eclipse.xtext.xbase.lib.Exceptions;
+import org.eclipse.xtext.xbase.lib.Functions.Function1;
 import org.eclipse.xtext.xbase.lib.IterableExtensions;
+import org.eclipse.xtext.xbase.lib.ListExtensions;
 
 @FinalFieldsConstructor
 @SuppressWarnings("all")
@@ -34,80 +40,104 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
   
   private final ClassFileCache classFileCache;
   
+  private Map<QualifiedName, NameEnvironmentAnswer> nameToAnswerCache = CollectionLiterals.<QualifiedName, NameEnvironmentAnswer>newHashMap();
+  
   @Override
   public void cleanup() {
+    this.nameToAnswerCache.clear();
+    this.classFileCache.clear();
   }
   
   @Override
   public NameEnvironmentAnswer findType(final char[][] compoundTypeName) {
-    final int len = compoundTypeName.length;
-    if ((len == 1)) {
-      return this.findType(QualifiedName.create(String.valueOf(compoundTypeName[0])));
-    }
-    final QualifiedName.Builder qnBuilder = new QualifiedName.Builder(len);
-    for (final char[] segment : compoundTypeName) {
-      qnBuilder.add(String.valueOf(segment));
-    }
-    return this.findType(qnBuilder.build());
+    final Function1<char[], String> _function = (char[] it) -> {
+      return String.valueOf(it);
+    };
+    final QualifiedName className = QualifiedName.create(ListExtensions.<char[], String>map(((List<char[]>)Conversions.doWrapArray(compoundTypeName)), _function));
+    return this.findType(className);
   }
   
   public NameEnvironmentAnswer findType(final QualifiedName className) {
-    final Function<QualifiedName, Object> _function = (QualifiedName it) -> {
-      try {
-        final IEObjectDescription candidate = IterableExtensions.<IEObjectDescription>head(this.resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false));
-        if ((candidate != null)) {
-          final URI resourceURI = candidate.getEObjectURI().trimFragment();
-          final Resource res = this.resource.getResourceSet().getResource(resourceURI, false);
-          char[] _xifexpression = null;
-          if ((res instanceof JavaResource)) {
-            _xifexpression = ((JavaResource) res).getOriginalSource();
-          } else {
-            char[] _xblockexpression = null;
-            {
-              final IResourceDescription resourceDescription = this.resourceDescriptions.getResourceDescription(resourceURI);
-              _xblockexpression = this.stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray();
-            }
-            _xifexpression = _xblockexpression;
-          }
-          final char[] source = _xifexpression;
-          String _string = className.toString("/");
-          String _plus = (_string + ".java");
-          return new CompilationUnit(source, _plus, null);
+    try {
+      boolean _containsKey = this.classFileCache.containsKey(className);
+      if (_containsKey) {
+        final IBinaryType t = this.classFileCache.get(className);
+        if ((t == null)) {
+          return null;
+        }
+        return new NameEnvironmentAnswer(t, null);
+      }
+      boolean _containsKey_1 = this.nameToAnswerCache.containsKey(className);
+      if (_containsKey_1) {
+        return this.nameToAnswerCache.get(className);
+      }
+      final IEObjectDescription candidate = IterableExtensions.<IEObjectDescription>head(this.resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false));
+      NameEnvironmentAnswer result = null;
+      if ((candidate != null)) {
+        final IResourceDescription resourceDescription = this.resourceDescriptions.getResourceDescription(candidate.getEObjectURI().trimFragment());
+        final Resource res = this.resource.getResourceSet().getResource(resourceDescription.getURI(), false);
+        String _xifexpression = null;
+        if ((res instanceof JavaResource)) {
+          _xifexpression = ((JavaResource) res).getOriginalSource();
         } else {
-          String _string_1 = className.toString("/");
-          final String fileName = (_string_1 + ".class");
-          final InputStream stream = this.classLoader.getResourceAsStream(fileName);
-          if ((stream == null)) {
-            return null;
+          _xifexpression = this.stubGenerator.getJavaStubSource(candidate, resourceDescription);
+        }
+        final String source = _xifexpression;
+        char[] _charArray = source.toCharArray();
+        String _string = className.toString("/");
+        String _plus = (_string + ".java");
+        CompilationUnit _compilationUnit = new CompilationUnit(_charArray, _plus, null);
+        NameEnvironmentAnswer _nameEnvironmentAnswer = new NameEnvironmentAnswer(_compilationUnit, null);
+        result = _nameEnvironmentAnswer;
+      } else {
+        String _string_1 = className.toString("/");
+        final String fileName = (_string_1 + ".class");
+        final URL url = this.classLoader.getResource(fileName);
+        if ((url == null)) {
+          this.nameToAnswerCache.put(className, null);
+          this.classFileCache.put(className, null);
+          return null;
+        }
+        InputStream stream = null;
+        ClassFileReader _xtrycatchfinallyexpression = null;
+        try {
+          ClassFileReader _xblockexpression = null;
+          {
+            stream = url.openStream();
+            _xblockexpression = ClassFileReader.read(url.openStream(), fileName);
           }
-          try {
-            return ClassFileReader.read(stream, fileName);
-          } finally {
+          _xtrycatchfinallyexpression = _xblockexpression;
+        } finally {
+          if ((stream != null)) {
             stream.close();
           }
         }
-      } catch (Throwable _e) {
-        throw Exceptions.sneakyThrow(_e);
+        final IBinaryType reader = _xtrycatchfinallyexpression;
+        if ((reader == null)) {
+          return null;
+        }
+        this.classFileCache.put(className, reader);
+        NameEnvironmentAnswer _nameEnvironmentAnswer_1 = new NameEnvironmentAnswer(reader, null);
+        result = _nameEnvironmentAnswer_1;
       }
-    };
-    return this.classFileCache.computeIfAbsent(className, _function);
+      this.nameToAnswerCache.put(className, result);
+      return result;
+    } catch (Throwable _e) {
+      throw Exceptions.sneakyThrow(_e);
+    }
   }
   
   @Override
   public NameEnvironmentAnswer findType(final char[] typeName, final char[][] packageName) {
-    int _length = packageName.length;
-    boolean _tripleEquals = (_length == 0);
-    if (_tripleEquals) {
-      return this.findType(QualifiedName.create(String.valueOf(typeName)));
-    }
-    int _length_1 = packageName.length;
-    int _plus = (_length_1 + 1);
-    final QualifiedName.Builder qnBuilder = new QualifiedName.Builder(_plus);
-    for (final char[] packageSegment : packageName) {
-      qnBuilder.add(String.valueOf(packageSegment));
-    }
-    qnBuilder.add(String.valueOf(typeName));
-    return this.findType(qnBuilder.build());
+    final Function1<char[], String> _function = (char[] it) -> {
+      return String.valueOf(it);
+    };
+    List<String> _map = ListExtensions.<char[], String>map(((List<char[]>)Conversions.doWrapArray(packageName)), _function);
+    final ArrayList<String> list = new ArrayList<String>(_map);
+    String _valueOf = String.valueOf(typeName);
+    list.add(_valueOf);
+    final QualifiedName className = QualifiedName.create(list);
+    return this.findType(className);
   }
   
   @Override

@@ -23,6 +23,7 @@ import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeParameter;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader;
+import org.eclipse.jdt.internal.compiler.env.IBinaryType;
 import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 import org.eclipse.jdt.internal.compiler.parser.Parser;
@@ -208,7 +209,7 @@ public class JavaDerivedStateComputer {
       for (final ClassFile cls : _classFiles) {
         {
           final QualifiedName key = QualifiedName.create(CharOperation.toStrings(cls.getCompoundName()));
-          final Function<QualifiedName, Object> _function_1 = (QualifiedName name) -> {
+          final Function<QualifiedName, IBinaryType> _function_1 = (QualifiedName name) -> {
             try {
               byte[] _bytes = cls.getBytes();
               char[] _fileName = cls.fileName();
