@@ -1,6 +1,5 @@
 package org.eclipse.xtext.java.resource
 
-import java.util.List
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader
@@ -24,8 +23,15 @@ import org.eclipse.xtext.resource.IResourceDescriptions
 	}
 
 	override findType(char[][] compoundTypeName) {
-		val className = QualifiedName.create(compoundTypeName.map[String.valueOf(it)])
-		return findType(className)
+		val len = compoundTypeName.length
+		if (len === 1) {
+			return findType(QualifiedName.create(String.valueOf(compoundTypeName.get(0))));
+		}
+		val qnBuilder = new QualifiedName.Builder(len)
+		for(char[] segment: compoundTypeName) {
+			qnBuilder.add(String.valueOf(segment))
+		}
+		return findType(qnBuilder.build)
 	}
 	
 	def NameEnvironmentAnswer findType(QualifiedName className) {
@@ -57,13 +63,15 @@ import org.eclipse.xtext.resource.IResourceDescriptions
 	}
 
 	override findType(char[] typeName, char[][] packageName) {
-		val List<String> segments = newArrayList
-		for(char[] packageSegment: packageName) {
-			segments.add(String.valueOf(packageSegment))
+		if (packageName.length === 0) {
+			return findType(QualifiedName.create(String.valueOf(typeName)))
 		}
-		segments.add(String.valueOf(typeName))
-		val className = QualifiedName.create(segments)
-		return findType(className)
+		val qnBuilder = new QualifiedName.Builder(packageName.length + 1)
+		for(char[] packageSegment: packageName) {
+			qnBuilder.add(String.valueOf(packageSegment))
+		}
+		qnBuilder.add(String.valueOf(typeName))
+		return findType(qnBuilder.build)
 	}
 
 	override isPackage(char[][] parentPackageName, char[] packageName) {

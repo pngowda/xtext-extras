@@ -1,7 +1,6 @@
 package org.eclipse.xtext.java.resource;
 
 import java.io.InputStream;
-import java.util.List;
 import java.util.function.Function;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
@@ -18,12 +17,9 @@ import org.eclipse.xtext.naming.QualifiedName;
 import org.eclipse.xtext.resource.IEObjectDescription;
 import org.eclipse.xtext.resource.IResourceDescription;
 import org.eclipse.xtext.resource.IResourceDescriptions;
-import org.eclipse.xtext.xbase.lib.CollectionLiterals;
 import org.eclipse.xtext.xbase.lib.Conversions;
 import org.eclipse.xtext.xbase.lib.Exceptions;
-import org.eclipse.xtext.xbase.lib.Functions.Function1;
 import org.eclipse.xtext.xbase.lib.IterableExtensions;
-import org.eclipse.xtext.xbase.lib.ListExtensions;
 
 @FinalFieldsConstructor
 @SuppressWarnings("all")
@@ -44,11 +40,15 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
   
   @Override
   public NameEnvironmentAnswer findType(final char[][] compoundTypeName) {
-    final Function1<char[], String> _function = (char[] it) -> {
-      return String.valueOf(it);
-    };
-    final QualifiedName className = QualifiedName.create(ListExtensions.<char[], String>map(((List<char[]>)Conversions.doWrapArray(compoundTypeName)), _function));
-    return this.findType(className);
+    final int len = compoundTypeName.length;
+    if ((len == 1)) {
+      return this.findType(QualifiedName.create(String.valueOf(compoundTypeName[0])));
+    }
+    final QualifiedName.Builder qnBuilder = new QualifiedName.Builder(len);
+    for (final char[] segment : compoundTypeName) {
+      qnBuilder.add(String.valueOf(segment));
+    }
+    return this.findType(qnBuilder.build());
   }
   
   public NameEnvironmentAnswer findType(final QualifiedName className) {
@@ -95,13 +95,19 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
   
   @Override
   public NameEnvironmentAnswer findType(final char[] typeName, final char[][] packageName) {
-    final List<String> segments = CollectionLiterals.<String>newArrayList();
-    for (final char[] packageSegment : packageName) {
-      segments.add(String.valueOf(packageSegment));
+    int _length = packageName.length;
+    boolean _tripleEquals = (_length == 0);
+    if (_tripleEquals) {
+      return this.findType(QualifiedName.create(String.valueOf(typeName)));
     }
-    segments.add(String.valueOf(typeName));
-    final QualifiedName className = QualifiedName.create(segments);
-    return this.findType(className);
+    int _length_1 = packageName.length;
+    int _plus = (_length_1 + 1);
+    final QualifiedName.Builder qnBuilder = new QualifiedName.Builder(_plus);
+    for (final char[] packageSegment : packageName) {
+      qnBuilder.add(String.valueOf(packageSegment));
+    }
+    qnBuilder.add(String.valueOf(typeName));
+    return this.findType(qnBuilder.build());
   }
   
   @Override
