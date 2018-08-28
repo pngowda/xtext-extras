@@ -4,7 +4,6 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader;
@@ -20,7 +19,6 @@ import org.eclipse.xtext.naming.QualifiedName;
 import org.eclipse.xtext.resource.IEObjectDescription;
 import org.eclipse.xtext.resource.IResourceDescription;
 import org.eclipse.xtext.resource.IResourceDescriptions;
-import org.eclipse.xtext.xbase.lib.CollectionLiterals;
 import org.eclipse.xtext.xbase.lib.Conversions;
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.eclipse.xtext.xbase.lib.Functions.Function1;
@@ -40,11 +38,9 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
   
   private final ClassFileCache classFileCache;
   
-  private Map<QualifiedName, NameEnvironmentAnswer> cache = CollectionLiterals.<QualifiedName, NameEnvironmentAnswer>newHashMap();
-  
   @Override
   public void cleanup() {
-    this.cache.clear();
+    this.classFileCache.clear();
   }
   
   @Override
@@ -65,10 +61,6 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
           return null;
         }
         return new NameEnvironmentAnswer(t, null);
-      }
-      boolean _containsKey_1 = this.cache.containsKey(className);
-      if (_containsKey_1) {
-        return this.cache.get(className);
       }
       final IEObjectDescription candidate = IterableExtensions.<IEObjectDescription>head(this.resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false));
       NameEnvironmentAnswer result = null;
@@ -93,7 +85,6 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
         final String fileName = (_string_1 + ".class");
         final URL url = this.classLoader.getResource(fileName);
         if ((url == null)) {
-          this.cache.put(className, null);
           this.classFileCache.put(className, null);
           return null;
         }
@@ -119,7 +110,6 @@ public class IndexAwareNameEnvironment implements INameEnvironment {
         NameEnvironmentAnswer _nameEnvironmentAnswer_1 = new NameEnvironmentAnswer(reader, null);
         result = _nameEnvironmentAnswer_1;
       }
-      this.cache.put(className, result);
       return result;
     } catch (Throwable _e) {
       throw Exceptions.sneakyThrow(_e);
