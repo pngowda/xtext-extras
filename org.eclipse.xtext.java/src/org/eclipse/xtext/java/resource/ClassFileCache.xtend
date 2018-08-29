@@ -13,54 +13,40 @@ import java.util.function.Function
 import org.eclipse.jdt.internal.compiler.env.IBinaryType
 import org.eclipse.xtext.naming.QualifiedName
 import org.eclipse.xtext.util.internal.EmfAdaptable
+import org.eclipse.jdt.internal.compiler.env.NameEnvironmentAnswer
+import org.eclipse.jdt.internal.compiler.env.ICompilationUnit
 
 /**
  * @author Christian Dietrich - Initial contribution and API
- * @since 2.14
+ * @since 2.15
  */
 @EmfAdaptable
 class ClassFileCache {
 	
 	static val NULL = new Object();
 	
-	//TODO: concurrency
-	//TODO: clear
-	//TODO: weak?
-	// type if Object by intention, but we store IBinaryTypes only
 	val Map<QualifiedName, Object> cache = new ConcurrentHashMap()
-	
-	def boolean containsKey(QualifiedName qualifiedName) {
-		return cache.containsKey(qualifiedName)
-	}
-	
-	def IBinaryType get(QualifiedName qualifiedName) {
-		val result = cache.get(qualifiedName)
-		if (result === NULL) {
-			return null
+	 
+	def NameEnvironmentAnswer computeIfAbsent(QualifiedName qualifiedName, Function<? super QualifiedName, ? extends Object> compiler) {
+		/*
+		 * Implementation note:
+		 * 
+		 * We do intentionally not use #computeIfAbsent since that would be a synchronized call per qualifiedName.
+		 * When building, we process resources partially in parallel and the synchronization may cause unnecessary
+		 * contention. It is perfectly ok, if for some qualifiedName the Java compiler is used more than once though.
+		 */
+		var binaryTypeOrCompilationUnit = cache.get(qualifiedName);
+		if (binaryTypeOrCompilationUnit === null) {
+			binaryTypeOrCompilationUnit = compiler.apply(qualifiedName) ?: NULL
+			cache.put(qualifiedName, binaryTypeOrCompilationUnit)
 		}
-		return result as IBinaryType
-	}
-	
-	def void put(QualifiedName qualifiedName, IBinaryType answer) {
-		if (answer === null) {
-			cache.put(qualifiedName, NULL)
-		} else {
-			cache.put(qualifiedName, answer)
+		if (binaryTypeOrCompilationUnit instanceof IBinaryType) {
+			return new NameEnvironmentAnswer(binaryTypeOrCompilationUnit, null)	
 		}
-	}
-	
-	def IBinaryType computeIfAbsent(QualifiedName qualifiedName, Function<? super QualifiedName, ? extends IBinaryType> fun) {
-		val result = cache.computeIfAbsent(qualifiedName) [
-			fun.apply(it) ?: NULL
-		]
-		if (result !== NULL) { // TODO should this ever happen
-			return result as IBinaryType;
+		if (binaryTypeOrCompilationUnit instanceof ICompilationUnit) {
+			return new NameEnvironmentAnswer(binaryTypeOrCompilationUnit, null)
 		}
 		return null
-	}
-	
-	def void clear() {
-		cache.clear()
 	}
 	
 }

@@ -30,7 +30,10 @@ import org.eclipse.xtext.resource.IFragmentProvider
 import org.eclipse.xtext.resource.IFragmentProvider.Fallback
 import org.eclipse.xtext.resource.ISynchronizable
 import org.eclipse.xtext.util.concurrent.IUnitOfWork
-import org.eclipse.jdt.internal.compiler.util.Util
+import java.io.BufferedInputStream
+import java.io.StringReader
+import org.eclipse.xtext.util.LazyStringInputStream
+import java.io.Reader
 
 class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISynchronizable<JavaResource> {
 	
@@ -55,8 +58,20 @@ class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver, ISync
 	
 	override protected doLoad(InputStream inputStream, Map<?, ?> options) throws IOException {
 		val encoding = getEncoding(getURI, options)
-		contentsAsArray = Util.getInputStreamAsCharArray(inputStream, -1, encoding)
-		compilationUnit = new CompilationUnit(contentsAsArray, URI.lastSegment, encoding, null)
+		val reader = createReader(inputStream, encoding)
+		try {
+			contentsAsArray = CharStreams.toString(reader).toCharArray
+			compilationUnit = new CompilationUnit(contentsAsArray, URI.lastSegment, encoding, null)	
+		} finally {
+			reader?.close
+		}
+	}
+	
+	def protected Reader createReader(InputStream inputStream, String encoding) throws IOException {
+		if (inputStream instanceof LazyStringInputStream) {
+			return new StringReader(inputStream.getString());
+		}
+		return new InputStreamReader(new BufferedInputStream(inputStream), encoding);
 	}
 	
 	protected def getEncoding(URI uri, Map<?, ?> options) {

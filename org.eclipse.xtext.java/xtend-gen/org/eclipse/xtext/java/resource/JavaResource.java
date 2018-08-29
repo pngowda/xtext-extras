@@ -1,10 +1,15 @@
 package org.eclipse.xtext.java.resource;
 
 import com.google.common.base.Objects;
+import com.google.common.io.CharStreams;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.emf.common.util.EList;
@@ -16,7 +21,6 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
-import org.eclipse.jdt.internal.compiler.util.Util;
 import org.eclipse.xtend.lib.annotations.AccessorType;
 import org.eclipse.xtend.lib.annotations.Accessors;
 import org.eclipse.xtext.common.types.JvmDeclaredType;
@@ -31,6 +35,7 @@ import org.eclipse.xtext.java.resource.JavaDerivedStateComputer;
 import org.eclipse.xtext.parser.IEncodingProvider;
 import org.eclipse.xtext.resource.IFragmentProvider;
 import org.eclipse.xtext.resource.ISynchronizable;
+import org.eclipse.xtext.util.LazyStringInputStream;
 import org.eclipse.xtext.util.concurrent.IUnitOfWork;
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.eclipse.xtext.xbase.lib.ObjectExtensions;
@@ -126,10 +131,26 @@ public class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver
   @Override
   protected void doLoad(final InputStream inputStream, final Map<?, ?> options) throws IOException {
     final String encoding = this.getEncoding(this.getURI(), options);
-    this.contentsAsArray = Util.getInputStreamAsCharArray(inputStream, (-1), encoding);
-    String _lastSegment = this.getURI().lastSegment();
-    CompilationUnit _compilationUnit = new CompilationUnit(this.contentsAsArray, _lastSegment, encoding, null);
-    this.compilationUnit = _compilationUnit;
+    final Reader reader = this.createReader(inputStream, encoding);
+    try {
+      this.contentsAsArray = CharStreams.toString(reader).toCharArray();
+      String _lastSegment = this.getURI().lastSegment();
+      CompilationUnit _compilationUnit = new CompilationUnit(this.contentsAsArray, _lastSegment, encoding, null);
+      this.compilationUnit = _compilationUnit;
+    } finally {
+      if (reader!=null) {
+        reader.close();
+      }
+    }
+  }
+  
+  protected Reader createReader(final InputStream inputStream, final String encoding) throws IOException {
+    if ((inputStream instanceof LazyStringInputStream)) {
+      String _string = ((LazyStringInputStream)inputStream).getString();
+      return new StringReader(_string);
+    }
+    BufferedInputStream _bufferedInputStream = new BufferedInputStream(inputStream);
+    return new InputStreamReader(_bufferedInputStream, encoding);
   }
   
   protected String getEncoding(final URI uri, final Map<?, ?> options) {
