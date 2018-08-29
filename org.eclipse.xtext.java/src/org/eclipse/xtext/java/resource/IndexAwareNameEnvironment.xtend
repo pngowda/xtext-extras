@@ -1,9 +1,12 @@
 package org.eclipse.xtext.java.resource
 
+import java.io.InputStream
 import java.util.ArrayList
 import java.util.Map
+import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader
+import org.eclipse.jdt.internal.compiler.env.IBinaryType
 import org.eclipse.jdt.internal.compiler.env.INameEnvironment
 import org.eclipse.jdt.internal.compiler.env.NameEnvironmentAnswer
 import org.eclipse.xtend.lib.annotations.FinalFieldsConstructor
@@ -11,9 +14,6 @@ import org.eclipse.xtext.common.types.TypesPackage
 import org.eclipse.xtext.common.types.descriptions.EObjectDescriptionBasedStubGenerator
 import org.eclipse.xtext.naming.QualifiedName
 import org.eclipse.xtext.resource.IResourceDescriptions
-import org.eclipse.emf.ecore.resource.Resource
-import java.io.InputStream
-import org.eclipse.jdt.internal.compiler.env.IBinaryType
 
 @FinalFieldsConstructor class IndexAwareNameEnvironment implements INameEnvironment {
 
@@ -31,8 +31,15 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryType
 	}
 
 	override findType(char[][] compoundTypeName) {
-		val className = QualifiedName.create(compoundTypeName.map[String.valueOf(it)])
-		return findType(className)
+		val len = compoundTypeName.length
+		if (len === 1) {
+			return findType(QualifiedName.create(String.valueOf(compoundTypeName.get(0))));
+		}
+		val qnBuilder = new QualifiedName.Builder(len)
+		for(char[] segment: compoundTypeName) {
+			qnBuilder.add(String.valueOf(segment))
+		}
+		return findType(qnBuilder.build)
 	}
 	
 	def NameEnvironmentAnswer findType(QualifiedName className) {
@@ -50,28 +57,27 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryType
 		val candidate = resourceDescriptions.getExportedObjects(TypesPackage.Literals.JVM_DECLARED_TYPE, className, false).head
 		var NameEnvironmentAnswer result = null 
 		if (candidate !== null) {
-			val resourceDescription = resourceDescriptions.getResourceDescription(candidate.EObjectURI.trimFragment)
-			val res = resource.resourceSet.getResource(resourceDescription.URI, false)
+			val resourceURI = candidate.EObjectURI.trimFragment
+			val res = resource.resourceSet.getResource(resourceURI, false)
 			val source = if (res instanceof JavaResource) {
 			    (res as JavaResource).originalSource
 			} else {
-			    stubGenerator.getJavaStubSource(candidate, resourceDescription)
+				val resourceDescription = resourceDescriptions.getResourceDescription(resourceURI)
+			    stubGenerator.getJavaStubSource(candidate, resourceDescription).toCharArray
 			}
-			result = new NameEnvironmentAnswer(new CompilationUnit(source.toCharArray, className.toString('/')+'.java', null), null)
+			result = new NameEnvironmentAnswer(new CompilationUnit(source, className.toString('/')+'.java', null), null)
 		} else {
 			val fileName = className.toString('/') + ".class"
-			val url = classLoader.getResource(fileName)
-			if (url === null) {
+			val stream = classLoader.getResourceAsStream(fileName)
+			if (stream === null) {
 				nameToAnswerCache.put(className, null)
 				//TODO is that ok
 				classFileCache.put(className, null)
 				return null;
 			}
 			// todo: try with resources/ close Stream
-			var InputStream stream = null
 			val IBinaryType reader = try {
-				stream = url.openStream
-				ClassFileReader.read(url.openStream, fileName)
+				ClassFileReader.read(stream, fileName)
 				//TODO what if read fails
 			} finally {
 				if (stream !== null) {
@@ -91,10 +97,15 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryType
 	}
 
 	override findType(char[] typeName, char[][] packageName) {
-		val list = new ArrayList(packageName.map[String.valueOf(it)])
-		list += String.valueOf(typeName)
-		val className = QualifiedName.create(list)
-		return findType(className)
+		if (packageName.length === 0) {
+			return findType(QualifiedName.create(String.valueOf(typeName)))
+		}
+		val qnBuilder = new QualifiedName.Builder(packageName.length + 1)
+		for(char[] packageSegment: packageName) {
+			qnBuilder.add(String.valueOf(packageSegment))
+		}
+		qnBuilder.add(String.valueOf(typeName))
+		return findType(qnBuilder.build)
 	}
 
 	override isPackage(char[][] parentPackageName, char[] packageName) {

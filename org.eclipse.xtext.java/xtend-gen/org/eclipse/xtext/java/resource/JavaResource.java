@@ -1,12 +1,10 @@
 package org.eclipse.xtext.java.resource;
 
 import com.google.common.base.Objects;
-import com.google.common.io.CharStreams;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.emf.common.util.EList;
@@ -18,6 +16,7 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
+import org.eclipse.jdt.internal.compiler.util.Util;
 import org.eclipse.xtend.lib.annotations.AccessorType;
 import org.eclipse.xtend.lib.annotations.Accessors;
 import org.eclipse.xtext.common.types.JvmDeclaredType;
@@ -122,17 +121,14 @@ public class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver
   
   private CompilationUnit compilationUnit;
   
-  private String contentsAsString;
+  private char[] contentsAsArray;
   
   @Override
   protected void doLoad(final InputStream inputStream, final Map<?, ?> options) throws IOException {
     final String encoding = this.getEncoding(this.getURI(), options);
-    InputStreamReader _inputStreamReader = new InputStreamReader(inputStream, encoding);
-    final String contentsAsString = CharStreams.toString(_inputStreamReader);
-    this.contentsAsString = contentsAsString;
-    char[] _charArray = contentsAsString.toCharArray();
+    this.contentsAsArray = Util.getInputStreamAsCharArray(inputStream, (-1), encoding);
     String _lastSegment = this.getURI().lastSegment();
-    CompilationUnit _compilationUnit = new CompilationUnit(_charArray, _lastSegment, encoding, null);
+    CompilationUnit _compilationUnit = new CompilationUnit(this.contentsAsArray, _lastSegment, encoding, null);
     this.compilationUnit = _compilationUnit;
   }
   
@@ -337,8 +333,8 @@ public class JavaResource extends ResourceImpl implements IJavaSchemeUriResolver
     return this.m.getFragment(eObject, this.fallback);
   }
   
-  public String getOriginalSource() {
-    return this.contentsAsString;
+  public char[] getOriginalSource() {
+    return this.contentsAsArray;
   }
   
   @Pure
