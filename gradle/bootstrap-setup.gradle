@@ -4,6 +4,7 @@
 
 // The repositories to query when constructing the Xtend compiler classpath
 repositories {
+	mavenCentral()
 	jcenter()
 	maven {
 		name 'xtend-bootstrap'

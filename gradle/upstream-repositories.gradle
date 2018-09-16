@@ -21,6 +21,7 @@ if (!hasProperty('upstreamBranch')) {
 def jenkinsPipelineRepo = { jobName -> "http://services.typefox.io/open-source/jenkins/job/$jobName/job/$upstreamBranch/lastStableBuild/artifact/build/maven-repository/" }
 
 repositories {
+	mavenCentral()
 	jcenter()
 	if (findProperty('useJenkinsSnapshots') == 'true') {
 		maven { url "http://services.typefox.io/open-source/jenkins/job/lsp4j/job/master/lastStableBuild/artifact/build/maven-repository/" }
